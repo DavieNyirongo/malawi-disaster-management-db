@@ -324,12 +324,32 @@ class DisasterRiskAssessment:
             self.dlg.analysisLogText.clear()
             self.dlg.analysisLogText.append("=== Starting Flood Risk Analysis ===\n")
             
+            # Get selected district from dropdown
+            selected_district = self.dlg.analysisDistrictCombo.currentText()
+            
             # Get flood-prone districts from database
             results = self.db_manager.get_flood_prone_districts()
             
             if not results:
                 QMessageBox.information(self.dlg, "Info", "No flood risk data found")
                 return
+            
+            # Filter results if specific district selected
+            if selected_district != "All Districts":
+                results = [r for r in results if r['district'] == selected_district]
+                
+                if not results:
+                    QMessageBox.information(
+                        self.dlg, 
+                        "Info", 
+                        f"No flood risk data found for {selected_district}"
+                    )
+                    self.dlg.analysisLogText.append(f"No flood data available for {selected_district}")
+                    return
+                
+                self.dlg.analysisLogText.append(f"Analyzing: {selected_district}\n")
+            else:
+                self.dlg.analysisLogText.append("Analyzing: All Districts\n")
             
             self.dlg.progressBar.setMaximum(len(results))
             
@@ -372,8 +392,13 @@ class DisasterRiskAssessment:
                 QCoreApplication.processEvents()
             
             # Display summary
+            if selected_district == "All Districts":
+                summary_title = "Overall Analysis Summary"
+            else:
+                summary_title = f"Analysis Summary - {selected_district}"
+            
             summary = f"""
-            <h3>Analysis Summary:</h3>
+            <h3>{summary_title}:</h3>
             <b>Districts Analyzed:</b> {len(results)}<br>
             <b>Total People Displaced (Historical):</b> {total_displaced:,}<br>
             <br>
@@ -381,12 +406,24 @@ class DisasterRiskAssessment:
             """
             
             for risk, count in sorted(risk_counts.items()):
-                summary += f"&nbsp;&nbsp;• {risk}: {count} districts<br>"
+                summary += f"&nbsp;&nbsp;• {risk}: {count} district{'s' if count > 1 else ''}<br>"
             
             self.dlg.summaryText.setHtml(summary)
             
             self.dlg.analysisLogText.append("\n✓ Analysis Complete!")
-            QMessageBox.information(self.dlg, "Success", f"Analyzed {len(results)} districts!")
+            
+            if selected_district == "All Districts":
+                QMessageBox.information(
+                    self.dlg, 
+                    "Success", 
+                    f"Analyzed {len(results)} districts!"
+                )
+            else:
+                QMessageBox.information(
+                    self.dlg, 
+                    "Success", 
+                    f"Analysis complete for {selected_district}!"
+                )
             
         except Exception as e:
             QMessageBox.critical(self.dlg, "Error", f"Analysis failed: {str(e)}")
